@@ -40,9 +40,13 @@ def main():
             end
         """
 
+<<<<<<< HEAD
     print(rule.parse(t1)[0])
     print(rule.parse(t2)[0])
     print(rule.parse(t3)[0])
+=======
+    print(rule.parse("print(input(Enter a number))")[0)
+>>>>>>> origin/master
 
 if __name__ == "__main__":
     main()
