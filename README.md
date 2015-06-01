@@ -23,8 +23,8 @@ Here are some of them:
 * `count.more(value)` - Will match the given count and more of elements.
 * `count.less(value)` - Will match count from one to the given count of elements.
 * `count.upTo(max, value)` - Will match count between the given count and the `max`imal count of given elements.
-* `name(nam, value)` - Will match the value as value in `dict` and the `nam` as the key.
-* `recurse()` - Will add object ID to database.
+* `name(nam, value)` - Will match the `value` as value in `dict` and the `nam` as the key.
+* `recurse()` - Will add object ID to database, then add code registered with ID and then run the code using its ID.
 * `$1 << $2` - Will add value to `recurse` object.
 
 Plus upcoming objects:
