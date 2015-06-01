@@ -4,14 +4,45 @@ from parse import *
 from utils import *
 
 def main():
+    setIgnored(" \n\t")
+
     w = word()
-    lpar = liter("(")
-    rpar = liter(")")
+
+    eq = liter("=")
+    colon = liter(":")
+
+    _if = key("if")
+    _end = key("end")
+    _and = key("and")
+    _or = key("or")
+
+    condition = recurse()
+    condition << (w + eq + w + optional((_and | _or) + condition))
 
     rule = recurse()
-    rule << name("call", name("name", w) + suppress(lpar) + name("args", count(0).more(w) ^ rule) + suppress(rpar))
+    rule << name("if", suppress(_if) + name("cond", condition) + suppress(colon) + name("body", rule | optional(count(1).more(w))) + suppress(_end))
 
-    print(rule.parse("print(input(Enter a number))"))
+    t1 = """
+            if hello = world:
+                if myName = John:
+                end
+            end
+        """
+
+    t2 = """
+            if name = Paul:
+            end
+        """
+
+    t3 = """
+            if hello = world:
+                hi
+            end
+        """
+
+    print(rule.parse(t1)[0])
+    print(rule.parse(t2)[0])
+    print(rule.parse(t3)[0])
 
 if __name__ == "__main__":
     main()

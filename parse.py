@@ -6,6 +6,7 @@ import sys
 
 _ignored = " "
 _recursed = {}
+_keywords = []
 
 def setIgnored(val):
     global _ignored
@@ -40,6 +41,9 @@ class element:
 
         return Xor(self, other)
 
+    def __invert__(self):
+        return Not(self)
+
 
 # EOF
 
@@ -48,6 +52,9 @@ class doc_end(element):
         super(doc_end, self).__init__("")
 
     def parse(self, string):
+        while len(string) > 0 and string[0] in _ignored:
+            string = string[1:]
+
         assert len(string) == 0, "Expecting an EOF in `%s`!" % string
 
         return "", ""
@@ -78,15 +85,19 @@ class word(element):
         self.chars = chars
 
     def parse(self, string):
+        bak = string
         v, string = self.valid(string)
 
         assert len(v) > 0, "Invalid characters used in `%s`!" % string
 
-        return v, string
+        if v in _keywords:
+            return "", bak
+        else:
+            return v, string
 
     def valid(self, string):
         i = 0
-        while string[0] in _ignored:
+        while len(string) > 0 and string[0] in _ignored:
             string = string[1:]
 
         validWord = ""
@@ -105,35 +116,33 @@ class liter(element):
         self.lit = lit
 
     def parse(self, string):
-        while string[0] in _ignored:
+        while len(string) > 0 and string[0] in _ignored:
             string = string[1:]
 
-        assert string[:len(self.lit)] == self.lit, "Invalid literal `%s`!" % string[:len(self.lit)]
+        assert string[:len(self.lit)] == self.lit, "Invalid literal `%s`, expecting `%s`!" % (string[:len(self.lit)], self.lit)
 
         return self.lit, string[len(self.lit):]
 
     def __str__(self):
-        return self.lit
+        return '"' + self.lit + '"'
 
 class key(element):
     def __init__(self, k):
         super(key, self).__init__(str(k))
 
+        _keywords.append(k)
         self.k = liter(k)
 
     def parse(self, string):
         a, string = self.k.parse(string)
 
 
-        c = 0
-        while string[0] in _ignored:
-            string = string[1:]
-            c += 1
-
-        if c == 0:
-            raise SyntaxError("`key` object requires whitespaces around `%s`!" % string)
+        assert string[0] in _ignored, "`key` object requires whitespaces around `%s`!" % string
 
         return a, string
+
+    def __str__(self):
+        return str(self.k)
 
 
 # Additional control structures
@@ -260,7 +269,7 @@ class Or(element):
         return expand(a), string
 
     def __str__(self):
-        return str(self.first) + " | " + str(self.second)
+        return "( " + str(self.first) + " ) | ( " + str(self.second) + " )"
 
 class Xor(element):
     def __init__(self, first, second):
@@ -289,7 +298,21 @@ class Xor(element):
             return expand(b), bak
 
     def __str__(self):
-        return str(self.first) + " ^ " + str(self.second)
+        return "( " + str(self.first) + " ) ^ ( " + str(self.second) + " )"
+
+class Not(element):
+    def __init__(self, value):
+        super(Not, self).__init__(str(value))
+
+        self.value = value
+
+    def parse(self, string):
+        try:
+            self.value.parse(string)
+        except:
+            return "", string
+
+        raise SyntaxError("Not expecting `%s` in `%s`!" % (str(self.value), string))
 
 
 # TODO: !DANGER - COMPLICATED (AND RECURSIVE) ELEMENTS!
@@ -305,9 +328,18 @@ class recurse(element):
         _recursed[self.id] = value
 
     def parse(self, string):
-        a, string = _recursed[self.id].parse(string)
+        try:
+            #return
+            a, string = _recursed[self.id].parse(string)
+        except RuntimeError:
+            raise RuntimeError("Recurse element execution failed!")
+        except:
+            raise
 
         return a, string
+
+    def __str__(self):
+        return "<parse.recurse::" + str(self.id) + ">"
 
 
 DOC_END = doc_end()
