@@ -5,9 +5,8 @@ Process text like never before.
 Parse.py is Python module that will let you process strings and generate structured output.
 
 ## Usage
-### Introduction
-Parse.py includes several objects that are processing input differently and generating different output.   
-Here are some of them:   
+### Documentation
+#### Objects
 * `word(chars="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")` - Will match a word that contains these characters.
 * `liter(lit)` - Will match a piece of input that exactly match argument, doesn't require whitespaces around.
 * `key(k)` - Will match a piece of input that exactly match argument, require whitespaces around.
@@ -29,3 +28,6 @@ Here are some of them:
 
 Plus upcoming objects:
 * `combine(value)` - Will `"".join(...)` the output of its `value`.
+
+#### Functions and constants
+* `setIgnored(val)` - Set ignored characters.
