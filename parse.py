@@ -1,4 +1,5 @@
-__author__ = 'John Ross'
+__author__ = 'Jan Růžička <jan.ruzicka01@gmail.com>'
+__version__ = "1.0.0"
 
 from utils import *
 import sys
