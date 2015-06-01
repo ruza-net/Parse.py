@@ -31,3 +31,8 @@ Plus upcoming objects:
 
 #### Functions and constants
 * `setIgnored(val)` - Set ignored characters.
+* `DOC_END` - Just EOF.
+
+#### Frequently made mistakes
+- *The `<<` operator precedence.* - I made one too. If you write `rule << word() + word() | liter("!")` it will take just the first `word()`. Write `rule << (word() + word() | liter("!"))` instead. (Assumning that `rule = recurse()`)
+- *Overstacking Python* - I made one too. If you write `rule << (word() + liter("=") + word() | rule + key("and") + rule)` it will infinitely match the second branch (`rule + key("and") + rule`), because the `rule` is matching, because the `rule` is matching, because the `rule` is matching, because the `rule` is matching, ... Write `rule << (word() + liter("=") + word() + optional(key("and") + rule))` instead. (Assumning that `rule = recurse()`)
