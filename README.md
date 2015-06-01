@@ -24,7 +24,8 @@ Here are some of them:
 * `count.less(value)` - Will match count from one to the given count of elements.
 * `count.upTo(max, value)` - Will match count between the given count and the `max`imal count of given elements.
 * `name(nam, value)` - Will match the value as value in `dict` and the `nam` as the key.
-
-Plus there are upcoming objects:
 * `recurse()` - Will add object ID to database.
 * `$1 << $2` - Will add value to `recurse` object.
+
+Plus upcoming objects:
+* `combine(value)` - Will `"".join(...)` the output of its `value`.
