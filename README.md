@@ -1,13 +1,12 @@
-# Parse.py
+# Parse.py                    
 Process text like never before.
 
 ## Info
 Parse.py is Python module that will let you process strings and generate structured output.
 
 ## Usage
-### Introduction
-Parse.py includes several objects that are processing input differently and generating different output.   
-Here are some of them:   
+### Documentation
+#### Objects
 * `word(chars="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")` - Will match a word that contains these characters.
 * `liter(lit)` - Will match a piece of input that exactly match argument, doesn't require whitespaces around.
 * `key(k)` - Will match a piece of input that exactly match argument, require whitespaces around.
@@ -23,8 +22,17 @@ Here are some of them:
 * `count.more(value)` - Will match the given count and more of elements.
 * `count.less(value)` - Will match count from one to the given count of elements.
 * `count.upTo(max, value)` - Will match count between the given count and the `max`imal count of given elements.
-* `name(nam, value)` - Will match the value as value in `dict` and the `nam` as the key.
-
-Plus there are upcoming objects:
-* `recurse()` - Will add object ID to database.
+* `name(nam, value)` - Will match the `value` as value in `dict` and the `nam` as the key.
+* `recurse()` - Will add object ID to database, then add code registered with ID and then run the code using its ID.
 * `$1 << $2` - Will add value to `recurse` object.
+
+Plus upcoming objects:
+* `combine(value)` - Will `"".join(...)` the output of its `value`.
+
+#### Functions and constants
+* `setIgnored(val)` - Set ignored characters.
+* `DOC_END` - Just EOF.
+
+#### Frequently made mistakes
+- *The `<<` operator precedence.* - I made one too. If you write `rule << word() + word() | liter("!")` it will take just the first `word()`. Write `rule << (word() + word() | liter("!"))` instead. (Assumning that `rule = recurse()`)
+- *Overstacking Python* - I made one too. If you write `rule << (word() + liter("=") + word() | rule + key("and") + rule)` it will infinitely match the second branch (`rule + key("and") + rule`), because the `rule` is matching, because the `rule` is matching, because the `rule` is matching, because the `rule` is matching, ... Write `rule << (word() + liter("=") + word() + optional(key("and") + rule))` instead. (Assumning that `rule = recurse()`)
