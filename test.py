@@ -37,7 +37,7 @@ def main():
             if name == "John Ross":
                 print("Hello world!")
             end
-<<<<<<< HEAD
+
     """
 
     s2 = """
@@ -45,13 +45,6 @@ def main():
     """
 
     ast = code.parse(s2)[0]
-=======
-        """
-        
-    print(rule.parse(t1)[0])
-    print(rule.parse(t2)[0])
-    print(rule.parse(t3)[0])
->>>>>>> origin/master
 
 if __name__ == "__main__":
     main()
