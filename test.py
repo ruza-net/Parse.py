@@ -1,52 +1,49 @@
 __author__ = 'John Ross'
 
+#import json
 from parse import *
 from utils import *
 
 def main():
     setIgnored(" \n\t")
 
-    w = word()
+    id = combine(word(ascii + "_") + optional(word(ascii_nums + "_")))
 
-    eq = liter("=")
+    IF = key("if")
+    END = key("end")
+    AND = key("and")
+    OR = key("or")
+
+    eqeq = liter("==")
     colon = liter(":")
+    lpar = liter("(")
+    rpar = liter(")")
 
-    _if = key("if")
-    _end = key("end")
-    _and = key("and")
-    _or = key("or")
+    string = name("string", combine(suppress(liter('"')) + skipTo(liter('"'), esc="\\", suppress=True)))
 
-    condition = recurse()
-    condition << (w + eq + w + optional((_and | _or) + condition))
+    funcal = recurse()
+    funcal << name("call", name("name", id) + suppress(lpar) + name("args", separated(funcal | string)) + suppress(rpar))
 
-    rule = recurse()
-    rule << name("if", suppress(_if) + name("cond", condition) + suppress(colon) + name("body", rule | optional(count(1).more(w))) + suppress(_end))
+    value = string | funcal | name("id", id)
 
-    t1 = """
-            if hello = world:
-                if myName = John:
-                end
+    cond = recurse()
+    cond << name("condition", name("equals", value + suppress(eqeq) + value) + optional(suppress(AND | OR) + cond))
+
+    _if = name("if", suppress(IF) + cond + suppress(colon) + funcal + suppress(END))
+
+    code = _if | funcal
+
+    s1 = """
+            if name == "John Ross":
+                print("Hello world!")
             end
-        """
+    """
 
-    t2 = """
-            if name = Paul:
-            end
-        """
+    s2 = """
+            print(input("Enter your name: "), "is", input("Enter your age: "), "years old.")
+    """
 
-    t3 = """
-            if hello = world:
-                hi
-            end
-        """
-
-<<<<<<< HEAD
-    print(rule.parse(t1)[0])
-    print(rule.parse(t2)[0])
-    print(rule.parse(t3)[0])
-=======
-    print(rule.parse("print(input(Enter a number))")[0)
->>>>>>> origin/master
+    ast = code.parse(s2)[0]
 
 if __name__ == "__main__":
     main()

@@ -1,4 +1,5 @@
-__author__ = 'John Ross'
+__author__ = 'Jan Růžička <jan.ruzicka01@gmail.com>'
+__version__ = "1.0.0"
 
 from utils import *
 import sys
@@ -24,24 +25,48 @@ class element:
         return len(str(self.string))
 
     def __add__(self, other):
-        if not issubclass(type(other), element):
+        if not issubclass(type(other), element) and type(other) is not str:
             raise TypeError("Can't combine element and %s!" % type(other))
+
+        if type(other) is str:
+            return And(self, key(other))
 
         return And(self, other)
 
     def __or__(self, other):
-        if not issubclass(type(other), element):
+        if not issubclass(type(other), element) and type(other) is not str:
             raise TypeError("Can't combine element and %s!" % type(other))
+
+        if type(other) is str:
+            return Or(self, key(other))
 
         return Or(self, other)
 
     def __xor__(self, other):
-        if not issubclass(type(other), element):
+        if not issubclass(type(other), element) and type(other) is not str:
             raise TypeError("Can't combine element and %s!" % type(other))
+
+        if type(other) is str:
+            return Xor(key(other), self)
 
         return Xor(self, other)
 
+    def __radd__(self, other):
+        o = key(other)
+        return And(o, self)
+
+    def __ror__(self, other):
+        o = key(other)
+        return Or(o, self)
+
+    def __rxor__(self, other):
+        o = key(other)
+        return Xor(o, self)
+
     def __invert__(self):
+        return Not(self)
+
+    def __neg__(self):
         return Not(self)
 
 
@@ -59,6 +84,9 @@ class doc_end(element):
 
         return "", ""
 
+    def __str__(self):
+        return " <EOF>"
+
 
 # Suppress an element
 
@@ -74,12 +102,76 @@ class suppress(element):
         return "", string
 
     def __str__(self):
-        return "(?:'" + str(self.value) + "')"
+        return "(?: " + str(self.value) + " )"
+
+
+# Skip to element
+
+class skipTo(element):
+    def __init__(self, value, **kwargs):
+        super(skipTo, self).__init__(str(value))
+
+        self.esc = kwargs.get("esc", None)
+        self.suppress = kwargs.get("suppress", False)
+
+        self.value = value
+
+    def parse(self, string):
+        piece = ""
+        i = 0
+        while True:
+            try:
+                assert piece[-1] != self.esc
+
+                a, string = self.value.parse(string)
+
+                if self.suppress:
+                    return piece.replace(self.esc, ""), string
+                else:
+                    return [piece.replace(self.esc, ""), a], string
+            except:
+                assert len(string) > 0, "Can't skip to `%s`!" % str(self.value)
+
+                piece += string[0]
+                string = string[1:]
+
+
+# List separated by elements
+
+class separated(element):
+    def __init__(self, value, **kwargs):
+        super(separated, self).__init__("")
+
+        self.sep = kwargs.get("sep", liter(","))
+        self.suppress = kwargs.get("suppress", False)
+
+        self.min = kwargs.get("min", 0)
+        self.max = kwargs.get("max", -1)
+
+        self.value = value
+
+    def parse(self, string):
+        out = []
+
+        while True:
+            a, string = self.value.parse(string)
+            out.append(a)
+
+            try:
+                string = self.sep.parse(string)[1]
+            except:
+                break
+
+        assert len(out) > self.min, "Minimal length %i not humbled!" % self.min
+        assert len(out) < self.max or self.max == -1, "Maximal length %i humbled!" % self.max
+
+        return expand(out), string
+
 
 # Classic elements
 
 class word(element):
-    def __init__(self, chars="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"):
+    def __init__(self, chars=ascii):
         super(word, self).__init__("")
 
         self.chars = chars
@@ -109,6 +201,9 @@ class word(element):
 
         return validWord, string[len(validWord):]
 
+    def __str__(self):
+        return "[" + self.chars + "]"
+
 class liter(element):
     def __init__(self, lit):
         super(liter, self).__init__(lit)
@@ -124,7 +219,7 @@ class liter(element):
         return self.lit, string[len(self.lit):]
 
     def __str__(self):
-        return '"' + self.lit + '"'
+        return "'" + self.lit + "'"
 
 class key(element):
     def __init__(self, k):
@@ -136,8 +231,7 @@ class key(element):
     def parse(self, string):
         a, string = self.k.parse(string)
 
-
-        assert string[0] in _ignored, "`key` object requires whitespaces around `%s`!" % string
+        assert len(string) == 0 or string[0] in _ignored, "`key` object requires whitespaces around `%s`!" % string
 
         return a, string
 
@@ -163,21 +257,31 @@ class optional(element):
         return expand(a), string
 
     def __str__(self):
-        return "?" + str(self.value)
+        return "?( " + str(self.value) + " )"
 
 class group(element):
     def __init__(self, value):
         super(group, self).__init__(str(value))
-
         self.value = value
 
     def parse(self, string):
         a, string = self.value.parse(string)
-
         return tuple(expand(a)), string
 
     def __str__(self):
-        return "(" + str(self.value) + ")"
+        return "( " + str(self.value) + " )"
+
+class combine(element):
+    def __init__(self, value):
+        super(combine, self).__init__(str(value))
+        self.value = value
+
+    def parse(self, string):
+        a, string = self.value.parse(string)
+        return "".join(expand(a)), string
+
+    def __str__(self):
+        return ">" + str(self.value) + "<"
 
 
 # Counter
@@ -231,7 +335,7 @@ class name(element):
         return {self.name: a}, string
 
     def __str__(self):
-        return "{" + str(self.name) + ": " + str(self.value) + "}"
+        return "{" + str(self.name) + ": " + str(self.value) + " }"
 
 
 # Operator classes
@@ -269,7 +373,7 @@ class Or(element):
         return expand(a), string
 
     def __str__(self):
-        return "( " + str(self.first) + " ) | ( " + str(self.second) + " )"
+        return str(self.first) + " | " + str(self.second)
 
 class Xor(element):
     def __init__(self, first, second):
@@ -298,7 +402,7 @@ class Xor(element):
             return expand(b), bak
 
     def __str__(self):
-        return "( " + str(self.first) + " ) ^ ( " + str(self.second) + " )"
+        return str(self.first) + " ^ " + str(self.second)
 
 class Not(element):
     def __init__(self, value):
