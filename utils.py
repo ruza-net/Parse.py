@@ -1,4 +1,5 @@
-__author__ = 'John Ross'
+__author__ = 'Jan Růžička <jan.ruzicka01@gmail.com>'
+__version__ = "0.5.0"
 
 import sys
 import string

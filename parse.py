@@ -1,8 +1,7 @@
 __author__ = 'Jan Růžička <jan.ruzicka01@gmail.com>'
-__version__ = "1.0.0"
+__version__ = "0.5.0"
 
 from utils import *
-import sys
 
 
 _ignored = " "
@@ -29,7 +28,7 @@ class element:
             raise TypeError("Can't combine element and %s!" % type(other))
 
         if type(other) is str:
-            return And(self, key(other))
+            other = key(other)
 
         return And(self, other)
 
@@ -38,7 +37,7 @@ class element:
             raise TypeError("Can't combine element and %s!" % type(other))
 
         if type(other) is str:
-            return Or(self, key(other))
+            other = key(other)
 
         return Or(self, other)
 
@@ -47,7 +46,7 @@ class element:
             raise TypeError("Can't combine element and %s!" % type(other))
 
         if type(other) is str:
-            return Xor(key(other), self)
+            other = key(other)
 
         return Xor(self, other)
 
@@ -56,12 +55,22 @@ class element:
         return And(o, self)
 
     def __ror__(self, other):
-        o = key(other)
-        return Or(o, self)
+        if not issubclass(type(other), element) and type(other) is not str:
+            raise TypeError("Can't combine element and %s!" % type(other))
+
+        if type(other) is str:
+            other = key(other)
+
+        return Or(other, self)
 
     def __rxor__(self, other):
-        o = key(other)
-        return Xor(o, self)
+        if not issubclass(type(other), element) and type(other) is not str:
+            raise TypeError("Can't combine element and %s!" % type(other))
+
+        if type(other) is str:
+            other = key(other)
+
+        return Xor(other, self)
 
     def __invert__(self):
         return Not(self)
@@ -231,7 +240,7 @@ class key(element):
     def parse(self, string):
         a, string = self.k.parse(string)
 
-        assert len(string) == 0 or string[0] in _ignored, "`key` object requires whitespaces around `%s`!" % string
+        assert len(string) == 0 or string[0] in _ignored, "`key` object requires whitespaces around `%s`!" % self.k
 
         return a, string
 
