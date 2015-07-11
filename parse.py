@@ -1,5 +1,5 @@
 __author__ = 'Jan Růžička <jan.ruzicka01@gmail.com>'
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 from utils import *
 import sys
@@ -744,11 +744,11 @@ class recurse(element):
         return "<parse.recurse::" + str(self.id) + ">"
 
 
-# Operators
+# Expression generator
 
-class operators(element):
+class expression(element):
     def __init__(self, member, *lines, **kwargs):
-        super(operators, self).__init__("")
+        super(expression, self).__init__("")
 
         self.lpar = kwargs.get("lpar", liter("("))
         self.rpar = kwargs.get("rpar", liter(")"))
