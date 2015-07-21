@@ -1,5 +1,5 @@
 __author__ = 'Jan Růžička <jan.ruzicka01@gmail.com>'
-__version__ = "1.0.1"
+__version__ = "1.0.5"
 
 from utils import *
 import sys
@@ -14,6 +14,14 @@ _keywords = []
 _literals = []
 
 _ops = {}
+
+
+def _addOp(op, att):
+    if type(op) in [And, Or, Xor]:
+        _addOp(op.first, att)
+        _addOp(op.second, att)
+    else:
+        _ops[str(op)] = att
 
 
 def setIgnored(val):
@@ -143,6 +151,7 @@ class skipTo(element):
         super(skipTo, self).__init__(str(value))
 
         self.esc = kwargs.get("esc", "\\")
+        self.cut = kwargs.get("cut", True)
         self.suppress = kwargs.get("suppress", False)
 
         if not issubclass(type(value), element):
@@ -157,12 +166,16 @@ class skipTo(element):
             try:
                 assert piece[-1] != self.esc
 
-                a, string = self.value.parse(string)
+                if self.cut:
+                    a, string = self.value.parse(string)
+                else:
+                    a = self.value.parse(string)
 
                 if self.suppress:
                     return piece.replace(self.esc, ""), string
                 else:
                     return [piece.replace(self.esc, ""), a], string
+
             except:
                 assert len(string) > 0, "Can't skip to `%s`!" % str(self.value)
 
@@ -176,11 +189,9 @@ class separated(element):
     def __init__(self, value, **kwargs):
         super(separated, self).__init__("")
 
-        t = kwargs.get("type", liter)
-
         stop = kwargs.get("stop", None)
 
-        self.sep = t(kwargs.get("sep", ","))
+        self.sep = kwargs.get("sep", liter(","))
 
         self.cut = kwargs.get("cut", True)
         self.suppress = kwargs.get("suppress", True)
@@ -189,7 +200,7 @@ class separated(element):
         self.max = kwargs.get("max", -1)
 
         if stop:
-            self.stop = t(stop)
+            self.stop = stop
         else:
             self.stop = None
 
@@ -200,6 +211,13 @@ class separated(element):
 
         self.value = value
 
+        if type(self.sep) is str:
+            self.sep = liter(self.sep)
+        if type(self.stop) is str:
+            self.stop = liter(self.stop)
+        if type(self.value) is str:
+            self.value = liter(self.value)
+
     def parse(self, string):
         out = []
 
@@ -209,7 +227,6 @@ class separated(element):
                 assert sep
 
                 a, string = self.value.parse(string)
-
                 out.append(a)
 
                 sep = False
@@ -235,8 +252,8 @@ class separated(element):
             except:
                 break
 
-        assert len(out) > self.min, "Minimal length %i not humbled!" % self.min
-        assert len(out) < self.max or self.max == -1, "Maximal length %i humbled!" % self.max
+        assert len(out) >= self.min, "Minimal length %i not humbled!" % self.min
+        assert len(out) <= self.max or self.max == -1, "Maximal length %i humbled!" % self.max
 
         return expand(out), string
 
@@ -264,9 +281,8 @@ class word(element):
             return v, string
 
     def valid(self, string):
-        if string[0] not in self.chars:
-            while len(string) > 0 and string[0] in _ignored and string[0] not in self.chars:
-                string = string[1:]
+        while len(string) > 0 and string[0] in _ignored and string[0] not in self.chars:
+            string = string[1:]
 
         validWord = ""
         for i, x in enumerate(list(string)):
@@ -288,27 +304,26 @@ class regex(element):
         self.exp = escapes(exp)
 
     def parse(self, string):
-        a = re.match(self.exp, string)
+        a = None
+        while len(string) > 0 and string[0] in _ignored:
+            a = re.match(self.exp, string)
+            if a:
+                break
+
+            string = string[1:]
 
         if not a:
-            while len(string) > 0 and string[0] in _ignored:
-                a = re.match(self.exp, string)
-
-                if a:
-                    break
-
-                string = string[1:]
+            a = re.match(self.exp, string)
 
             if not a:
-                a = re.match(self.exp, string)
+                raise SyntaxError("Regex evaluation fault!")
 
-                if not a:
-                    raise SyntaxError("Regex evaluation fault!")
+        #assert a.group(0) not in _literals and a.group(0) not in _keywords
 
         return [a.group(0)], string[len(a.group(0)):]
 
     def __str__(self):
-        return repr(str(self.exp))
+        return repr(str(self.exp))[1:-1]
 
 
 class liter(element):
@@ -321,16 +336,21 @@ class liter(element):
         self.lit = lit
 
     def parse(self, string):
-        if string[:len(self.lit)] != self.lit:
-            while len(string) > 0 and string[0] in _ignored and string[:len(self.lit)] != self.lit:
-                string = string[1:]
+        while len(string) > 0 and string[0] in _ignored and string[:len(self.lit)] != self.lit:
+            try:
+                assert string[:len(self.lit)] == self.lit, "Invalid literal `%s`, expecting `%s`!" % (string[:len(self.lit)], self.lit)
+                return self.lit, string[len(self.lit):]
+            except:
+                pass
 
-            assert string[:len(self.lit)] == self.lit, "Invalid literal `%s`, expecting `%s`!" % (string[:len(self.lit)], self.lit)
+            string = string[1:]
+
+        assert string[:len(self.lit)] == self.lit, "Invalid literal `%s`, expecting `%s`!" % (string[:len(self.lit)], self.lit)
 
         return self.lit, string[len(self.lit):]
 
     def __str__(self):
-        return "'" + str(self.lit) + "'"
+        return str(self.lit)
 
 
 class key(element):
@@ -338,7 +358,7 @@ class key(element):
         super(key, self).__init__(str(k))
 
         _keywords.append(k)
-        self.k = liter(k)
+        self.k = str(k)
 
     def parse(self, string):
         a = None
@@ -346,7 +366,9 @@ class key(element):
         c = 0
         while len(string) > 0 and string[0] in _ignored:
             try:
-                a, string = self.k.parse(string)
+                assert string[:len(self.k)] == self.k, "Invalid keyword `%s`!" % string[:len(self.k)]
+                a, string = self.k, string[len(self.k):]
+                break
             except:
                 pass
 
@@ -354,14 +376,15 @@ class key(element):
             string = string[1:]
 
         if not a:
-            a, string = self.k.parse(string)
+            assert string[:len(self.k)] == self.k, "Invalid keyword `%s`!" % string[:len(self.k)]
+            a, string = self.k, string[len(self.k):]
 
         assert (len(string) == 0 or string[0] in _ignored or string[0] in _literals) and c > 0, "`key` object requires whitespaces around `%s`!" % self.k[1:-1]
 
         return a, string
 
     def __str__(self):
-        return str(self.k)[1:-1]
+        return self.k
 
 
 # Additional control structures #
@@ -423,7 +446,18 @@ class combine(element):
 
     def parse(self, string):
         a, string = self.value.parse(string)
-        return "".join(expand(a)), string
+        a = expand(a)
+
+        n = None
+        for i, x in enumerate(a):
+            if type(x) is dict:
+                a[i] = list(x.values())[0]
+                n = list(x.keys())[0]
+
+        if n:
+            return {n: "".join(a)}, string
+        else:
+            return "".join(a), string
 
     def __str__(self):
         return ">" + str(self.value) + "<"
@@ -439,6 +473,66 @@ class count:
         - less(value) - Will match count of values from 0 to the initialized value.
         - more(value) - Will match count of value from the initialized value and 80.
     """
+
+    # Special object providing the count(...).more functionality
+
+    class _moreObject(element):
+        def __init__(self, cnt, value):
+            super(count._moreObject, self).__init__("")
+
+            if type(value) is str:
+                value = liter(value)
+
+            self.value = value
+            self.count = cnt
+
+        def parse(self, string):
+            out = []
+
+            i = 0
+            while True:
+                try:
+                    a, string = self.value.parse(string)
+                    out.append(a)
+
+                    i += 1
+                except:
+                    break
+
+            if self.count > i:
+                raise IndexError("Expecting more than %i elements!" % self.count)
+
+            return expand(out), string
+
+    # Special object providing the count(...).less functionality
+
+    class _lessObject(element):
+        def __init__(self, cnt, value):
+            super(count._lessObject, self).__init__("")
+
+            if type(value) is str:
+                value = liter(value)
+
+            self.value = value
+            self.count = cnt
+
+        def parse(self, string):
+            out = []
+
+            i = 0
+            while True:
+                try:
+                    a, string = self.value.parse(string)
+                    out.append(a)
+
+                    i += 1
+                except:
+                    break
+
+            if i >= self.count:
+                raise IndexError("Expecting less than %i elements!" % self.count)
+
+            return expand(out), string
 
     def __init__(self, cnt):
         cnt = int(cnt)
@@ -465,15 +559,10 @@ class count:
         return code
 
     def less(self, value):
-        tmp = count(0)
-
-        return tmp.upTo(self.count, value)
+        return count._lessObject(self.count, value)
 
     def more(self, value):
-        if self.count < 1:
-            return optional(self.upTo(80, value))
-        else:
-            return self.upTo(80, value)
+        return count._moreObject(self.count, value)
 
 
 # Named output
@@ -618,6 +707,19 @@ class assocGroup(element):
         return a, string
 
 
+class lookahead(element):
+    def __init__(self, value):
+        super(lookahead, self).__init__("")
+
+        if type(value) is str:
+            value = liter(value)
+
+        self.value = value
+
+    def parse(self, string):
+        return self.value.parse(string)[0], string
+
+
 # Operator classes
 
 class And(element):
@@ -641,6 +743,7 @@ class And(element):
     def __str__(self):
         return str(self.first) + " + " + str(self.second)
 
+
 class Or(element):
     def __init__(self, first, second):
         super(Or, self).__init__("")
@@ -654,7 +757,6 @@ class Or(element):
         self.second = second
 
     def parse(self, string):
-        a = ""
         try:
             a, string = self.first.parse(string)
         except:
@@ -663,7 +765,8 @@ class Or(element):
         return expand(a), string
 
     def __str__(self):
-        return str(self.first) + " | " + str(self.second)
+        return "[ " + str(self.first) + " | " + str(self.second) + " ]"
+
 
 class Xor(element):
     def __init__(self, first, second):
@@ -747,6 +850,12 @@ class recurse(element):
 # Expression generator
 
 class expression(element):
+    """
+    Creates expression matcher that will parse members separated by defined operators.
+    member - The member (number, ...)
+    lines - Operator defines with the format (operator, arity, associativity[, ternary delimiter])
+    """
+
     def __init__(self, member, *lines, **kwargs):
         super(expression, self).__init__("")
 
@@ -757,7 +866,7 @@ class expression(element):
         lines = []
 
         for i, l in enumerate(lns):
-            el, prec, assoc, t, tern = (l + (opType.binary,None))[:5]
+            el, t, assoc, tern = (l + (None,))[:4]
 
             if not issubclass(type(el), element):
                 if type(el) is str:
@@ -765,37 +874,27 @@ class expression(element):
                 else:
                     raise TypeError("Operator must be element, not `%s`!" % type(el))
 
-            if type(prec) is not int:
-                raise TypeError("Operator precedence must be an integer, not `%s`!" % type(prec))
-
             if assoc not in range(1, 3):
                 raise TypeError("Operator association must be an integer between 1 and 2, not %i!" % assoc)
 
-            if prec > len(lns)-1:
-                print("Given operator precedence is greater that the maximal (%i, Number of operators - 1)." % len(lns)-1)
-
-                prec = len(lns) - 1
-
             if t not in range(1, 4):
-                raise TypeError("Operator type must be an integer between 1 and 3, not %i!" % t)
+                raise TypeError("Operator arity must be an integer between 1 and 3, not %i!" % t)
             elif t == 3:
                 if not issubclass(type(tern), element):
                     tern = el
 
-            lines.append((el, prec, assoc, t, tern))
+            lines.append((el, t, assoc, tern))
 
         self.lines = lines
         self.member = member
 
     def parse(self, string):
-        rule = None
-
         ternOps = None
         binOps = None
         unOps = None
 
-        for l in self.lines:
-            op, prec, assoc, t, tern = (l + (opType.binary,None))[:5]
+        for i, l in enumerate(self.lines):
+            op, t, assoc, tern = l
 
             if t == opType.unary:
                 if unOps:
@@ -815,11 +914,7 @@ class expression(element):
                 else:
                     ternOps = op
 
-            if type(op) in [And, Or, Xor, Not]:
-                _ops[str(op.first)[1:-1]] = [assoc, prec]
-                _ops[str(op.second)[1:-1]] = [assoc, prec]
-            else:
-                _ops[str(op)[1:-1]] = [assoc, prec]
+            _addOp(op, [assoc, len(self.lines) - i])
 
         atom = recurse()
 
@@ -839,13 +934,14 @@ class expression(element):
             member = optional(unOps) + member
 
         if binOps:
-            cont = optional(count(1).more(binOps + member))
-            binary = member + binOps + member + cont
+            binary = member + count(1).more(binOps + member)
 
-        atom << (unary | binary)
-        rule = assocGroup(atom)
+        atom << assocGroup(binary | unary)
 
-        return rule.parse(string)
+        return atom.parse(string)
+
+    def __str__(self):
+        return str(self.member) + " [ " + " ".join([str(x[0]) for x in self.lines]) + " ] " + str(self.member)
 
 
 DOC_END = doc_end()
